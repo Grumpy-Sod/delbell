@@ -1,0 +1,72 @@
+blueprint:
+  name: GivEnergy Seasonal Tariff Charging
+  description: >
+    Automatically sets GivEnergy inverter Timed Mode based on season (summer/winter),
+    optimised for E.ON Next Smart Saver tariff. Optional Solcast solar forecast support.
+  domain: automation
+  input:
+    mode_entity:
+      name: GivTCP Mode Selector
+      description: The GivTCP mode selector entity for your inverter
+      selector:
+        entity:
+          domain: select
+    solcast_entity:
+      name: Solcast Forecast Sensor (optional)
+      description: Forecasted solar generation for today, in kWh
+      default: ""
+      selector:
+        entity:
+          domain: sensor
+    solar_threshold:
+      name: Solar Forecast Threshold (kWh)
+      description: "Don't charge overnight if today's solar forecast ≥ this"
+      default: 6.0
+      selector:
+        number:
+          min: 0
+          max: 30
+          step: 0.5
+          unit_of_measurement: kWh
+
+trigger:
+  - platform: time
+    at: "00:00:00"
+
+variables:
+  month: "{{ now().month }}"
+  is_winter: "{{ month in [10,11,12,1,2,3] }}"
+  charge_start: "00:00"
+  charge_end: "{{ '07:00' if is_winter else '04:00' }}"
+  discharge_start: "16:00"
+  discharge_end: "{{ '22:00' if is_winter else '20:00' }}"
+  solar_forecast: "{{ states(solcast_entity) | float(0) }}"
+  should_charge: >
+    {% if solcast_entity == '' %}
+      true
+    {% else %}
+      {{ solar_forecast < solar_threshold }}
+    {% endif %}
+
+condition:
+  - condition: template
+    value_template: "{{ should_charge }}"
+
+action:
+  - service: select.select_option
+    target:
+      entity_id: !input mode_entity
+    data:
+      option: "Timed"
+  - service: mqtt.publish
+    data:
+      topic: "givtcp/charge_times"
+      payload: >
+        {
+          "charge_start": "{{ charge_start }}",
+          "charge_end": "{{ charge_end }}",
+          "discharge_start": "{{ discharge_start }}",
+          "discharge_end": "{{ discharge_end }}"
+        }
+
+mode: single
