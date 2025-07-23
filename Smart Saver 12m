@@ -36,8 +36,8 @@ trigger:
 variables:
   month: "{{ now().month }}"
   is_winter: "{{ month in [10,11,12,1,2,3] }}"
-  charge_start: "00:00"
-  charge_end: "{{ '07:00' if is_winter else '04:00' }}"
+  charge_start: "02:00"
+  charge_end: "{{ '05:00' if is_winter else '05:00' }}"
   discharge_start: "16:00"
   discharge_end: "{{ '22:00' if is_winter else '20:00' }}"
   solar_forecast: "{{ states(solcast_entity) | float(0) }}"
